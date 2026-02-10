@@ -14,10 +14,21 @@ export default function DataUpload({ onSuccess }: DataUploadProps) {
   const [featureColumns, setFeatureColumns] = useState('')
   const [controlColumns, setControlColumns] = useState('')
   const [loading, setLoading] = useState(false)
+  const MAX_UPLOAD_BYTES = 5_000_000 // 5 MB (must match backend limit)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFile(e.target.files[0])
+      const f = e.target.files[0]
+
+      if (f && f.size > MAX_UPLOAD_BYTES) {
+        toast.error('Archivo demasiado grande. Tamaño máximo: 5 MB')
+        // clear the input
+        e.currentTarget.value = ''
+        setFile(null)
+        return
+      }
+
+      setFile(f)
     }
   }
 
@@ -50,7 +61,7 @@ export default function DataUpload({ onSuccess }: DataUploadProps) {
         : undefined
 
       const response = await uploadData(
-        file,
+        file!,
         dateColumn,
         targetColumn,
         featureCols,
@@ -84,7 +95,10 @@ export default function DataUpload({ onSuccess }: DataUploadProps) {
             className="file-input"
             required
           />
-          {file && <p className="file-name">✓ {file.name}</p>}
+          <small className="hint">Tamaño máximo: 5 MB. Formato: .csv</small>
+          {file && (
+            <p className="file-name">✓ {file.name} — {(file.size / 1024 / 1024).toFixed(2)} MB</p>
+          )}
         </div>
 
         <div className="form-group">

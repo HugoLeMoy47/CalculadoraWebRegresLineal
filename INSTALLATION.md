@@ -122,6 +122,14 @@ Con `--reload`, el servidor se reinicia automáticamente cuando cambias código.
 - Documentación Swagger: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
+### Límites y validaciones del servidor
+
+- Tamaño máximo de archivo CSV aceptado por el endpoint `/upload`: **5 MB** (5_000_000 bytes). Si envías un archivo mayor, el servidor responde con HTTP 413 (Payload Too Large).
+- Límite máximo de muestras bootstrap aceptadas por el endpoint `/fit`: **5000**. Peticiones con valores mayores serán rechazadas o automáticamente limitadas por el servidor por razones de seguridad y uso de recursos.
+- El backend mantiene en memoria el último dataset cargado y el último modelo ajustado en `app.state`. Para entornos multiusuario o producción se recomienda persistencia (DB/Redis) y colas de trabajo para operaciones pesadas.
+
+Incluye validaciones cliente en el frontend para avisar al usuario sobre estos límites antes de enviar la petición.
+
 ### Terminal 2: Frontend React + Vite
 
 ```bash

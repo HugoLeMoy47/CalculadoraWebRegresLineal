@@ -35,6 +35,7 @@ Una calculadora web moderna para atribución de marketing basada en **regresión
 - Python 3.9+
 - Node.js 16+
 - npm o yarn
+Nota: Asegúrate de que Python esté disponible en PATH en Windows. Si no se encuentra el comando `python`, utiliza la ruta completa o instala Python 3.9+ y habilita "Agregar a PATH".
 
 ### Instalación
 
@@ -67,6 +68,11 @@ python -m uvicorn app.main:app --reload
 ```
 Backend disponible en: `http://localhost:8000`
 Documentación Swagger: `http://localhost:8000/docs`
+
+Nota importante de seguridad y límites
+- Tamaño máximo de upload: 5 MB (el endpoint `POST /upload` devolverá 413 si supera este límite).
+- Parámetro `bootstrap_samples` tiene un máximo práctico de 5000 para evitar uso excesivo de CPU/memoria; se valida en el backend.
+- CORS: el backend permite orígenes de desarrollo (`http://localhost:5173`, `http://localhost:3000`) — la configuración no usa `*` cuando `allow_credentials=True`.
 
 #### Terminal 2 - Frontend
 ```bash
@@ -356,7 +362,8 @@ Donde α es el parámetro de regularización (lambda).
 
 ### Error "CORS policy"
 → Asegúrate que backend corre en `http://localhost:8000`
-
+ - Verifica que `allow_origins` en `backend/app/main.py` incluye el origen del frontend. Por seguridad la configuración no usa `*` cuando `allow_credentials=True`.
+ - Si ves errores 403/blocked CORS, revisa la consola del navegador para el origen exacto y añádelo a `allow_origins`.
 ### Error "Datos no cargados"
 → Completa primero la pestaña "1. Cargar Datos"
 

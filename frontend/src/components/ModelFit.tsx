@@ -12,10 +12,17 @@ export default function ModelFit({ onSuccess }: ModelFitProps) {
   const [alpha, setAlpha] = useState(1.0)
   const [bootstrapSamples, setBootstrapSamples] = useState(1000)
   const [loading, setLoading] = useState(false)
+  const MAX_BOOTSTRAP = 5000 // must match backend limit
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    if (bootstrapSamples > MAX_BOOTSTRAP) {
+      toast.error(`El número máximo de muestras bootstrap es ${MAX_BOOTSTRAP}`)
+      setLoading(false)
+      return
+    }
 
     try {
       const response = await fitModel(
@@ -73,14 +80,17 @@ export default function ModelFit({ onSuccess }: ModelFitProps) {
         <div className="form-group">
           <label htmlFor="bootstrap">Muestras Bootstrap</label>
           <input
-            type="number"
-            id="bootstrap"
-            value={bootstrapSamples}
-            onChange={(e) => setBootstrapSamples(parseInt(e.target.value))}
-            min={100}
-            step={100}
-          />
-          <small>Para calcular intervalos de confianza. Valores típicos: 1000-5000</small>
+              type="number"
+              id="bootstrap"
+              value={bootstrapSamples}
+              onChange={(e) => setBootstrapSamples(parseInt(e.target.value))}
+              min={100}
+              max={MAX_BOOTSTRAP}
+              step={100}
+            />
+            <small>
+              Para calcular intervalos de confianza. Valores típicos: 1000-5000. <strong>Máx:</strong> {MAX_BOOTSTRAP}
+            </small>
         </div>
 
         <button
