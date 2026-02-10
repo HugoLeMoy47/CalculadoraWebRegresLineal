@@ -371,3 +371,22 @@ El proyecto incluye:
 **Estado: ✅ COMPLETADO**  
 **Fecha: Febrero 2026**  
 **Versión: 0.1.0**
+
+---
+
+## 🔔 Novedades y notas finales (actualización feb 2026)
+
+Se han aplicado mejoras y limitaciones importantes para seguridad, estabilidad y claridad operativa:
+
+- **Límites operativos:** el servidor ahora impone un tamaño máximo de archivo para `/upload` de **5 MB** y un tope de **5000** muestras para bootstrap en `/fit`. Estos límites protegen recursos y evitan cargas excesivas en entornos de desarrollo.
+- **Validación cliente:** el frontend muestra mensajes y previene el envío de archivos > 5 MB y bootstrap > 5000 (mensajes visibles en la UI).
+- **Estado en memoria:** el backend usa `app.state` para mantener el último dataset y modelo en memoria — útil para demos pero no persistente entre instancias. Ver `ARCHITECTURE.md` para recomendaciones de producción (persistencia, colas de trabajo, autenticación).
+- **Robustez:** mejor manejo de errores, sanitización de mensajes HTTP y límites en operaciones costosas (bootstrap cap).
+
+Si quieres, puedo:
+
+- Añadir autenticación básica (token) y scoping por usuario.
+- Persistir datasets y modelos en almacenamiento (SQLite/Redis/S3).
+- Extraer el proceso de bootstrap a una tarea background con progreso.
+
+Indica cuál de estas mejoras prefieres que implemente a continuación.
