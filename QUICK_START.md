@@ -50,6 +50,13 @@ npm run dev
 
 ---
 
+### Verificaciones rápidas de límites y CORS
+
+- Tamaño máximo de CSV aceptado por el backend en `/upload`: **5 MB**. Si tu archivo es mayor, cámbialo o reduce columnas/filas antes de subir.
+- Límite máximo de muestras `bootstrap` en `/fit`: **5000**. Ajusta el valor en la UI si recibes un error de validación.
+- CORS: el frontend de desarrollo corre en `http://localhost:5173` y el backend en `http://localhost:8000`. Si recibes errores CORS verifica que ambos servidores están en estos puertos o actualiza la configuración de `allow_origins` en `backend/app/main.py`.
+
+
 ## 📊 Usar la App (3 Clics)
 
 1. **Carga datos:** Sube `data/example_data.csv`
