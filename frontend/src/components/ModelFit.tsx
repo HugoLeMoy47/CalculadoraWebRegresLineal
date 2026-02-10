@@ -1,7 +1,26 @@
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  Stack,
+  FormControlLabel,
+  RadioGroup,
+  Radio,
+  Slider,
+  CircularProgress,
+  Alert,
+  AlertTitle,
+  Card,
+  CardContent,
+} from '@mui/material'
+import SettingsIcon from '@mui/icons-material/Settings'
+import InfoIcon from '@mui/icons-material/Info'
 import { fitModel } from '../api/client'
-import './ModelFit.css'
+import { showErrorWithTips } from '../utils/errorHandler'
 
 interface ModelFitProps {
   onSuccess: (results: any) => void
@@ -12,14 +31,20 @@ export default function ModelFit({ onSuccess }: ModelFitProps) {
   const [alpha, setAlpha] = useState(1.0)
   const [bootstrapSamples, setBootstrapSamples] = useState(1000)
   const [loading, setLoading] = useState(false)
-  const MAX_BOOTSTRAP = 5000 // must match backend limit
+  const MAX_BOOTSTRAP = 5000
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     if (bootstrapSamples > MAX_BOOTSTRAP) {
-      toast.error(`El número máximo de muestras bootstrap es ${MAX_BOOTSTRAP}`)
+      showErrorWithTips({
+        response: {
+          data: {
+            detail: `El número máximo de muestras bootstrap es ${MAX_BOOTSTRAP}`,
+          },
+        },
+      })
       setLoading(false)
       return
     }
@@ -32,98 +57,212 @@ export default function ModelFit({ onSuccess }: ModelFitProps) {
       )
 
       onSuccess(response.data)
-      toast.success('Modelo ajustado exitosamente')
+      toast.success('✓ Modelo ajustado exitosamente', { duration: 4000 })
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Error al ajustar modelo')
+      showErrorWithTips(error)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="model-fit-container">
-      <h2>Ajuste de Modelo de Regresión</h2>
-      <p className="subtitle">Configura los parámetros del modelo</p>
+    <Box sx={{ maxWidth: 700, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <SettingsIcon sx={{ mr: 1, color: 'primary.main', fontSize: 32 }} />
+        <Typography variant="h2" sx={{ fontWeight: 700 }}>
+          Ajuste de Modelo
+        </Typography>
+      </Box>
+      <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
+        Configura los parámetros del modelo de regresión lineal
+      </Typography>
 
-      <form onSubmit={handleSubmit} className="model-form">
-        <div className="form-group">
-          <label htmlFor="regularization">Tipo de Regularización</label>
-          <select
-            id="regularization"
-            value={regularization}
-            onChange={(e) => setRegularization(e.target.value)}
+      <form onSubmit={handleSubmit}>
+        <Stack spacing={3}>
+          {/* Regularization Selection */}
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Tipo de Regularización
+              </Typography>
+              <RadioGroup
+                value={regularization}
+                onChange={(e) => setRegularization(e.target.value)}
+              >
+                <FormControlLabel
+                  value="none"
+                  control={<Radio />}
+                  label={
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        Sin Regularización (OLS)
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Mínimos Cuadrados Ordinarios - Recomendado para la mayoría de casos
+                      </Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  value="ridge"
+                  control={<Radio />}
+                  label={
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        Ridge Regression (L2)
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Añade penalización para manejar multicolinealidad
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* Alpha Parameter */}
+          <Box
+            sx={{
+              opacity: regularization === 'none' ? 0.5 : 1,
+              pointerEvents: regularization === 'none' ? 'none' : 'auto',
+              transition: 'opacity 0.3s',
+            }}
           >
-            <option value="none">Sin regularización (OLS)</option>
-            <option value="ridge">Ridge (L2)</option>
-          </select>
-          <small>
-            OLS: Mínimos Cuadrados Ordinarios | Ridge: Añade penalización L2
-          </small>
-        </div>
-
-        <div className={`form-group ${regularization === 'none' ? 'disabled' : ''}`}>
-          <label htmlFor="alpha">
-            Parámetro de Regularización (Alpha)
-          </label>
-          <input
-            type="number"
-            id="alpha"
-            value={alpha}
-            onChange={(e) => setAlpha(parseFloat(e.target.value))}
-            min={0.01}
-            step={0.1}
-            disabled={regularization === 'none'}
-          />
-          <small>Solo aplicable para Ridge. Valores típicos: 0.1 - 10</small>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="bootstrap">Muestras Bootstrap</label>
-          <input
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              Parámetro de Regularización (Alpha)
+            </Typography>
+            <TextField
               type="number"
-              id="bootstrap"
+              value={alpha}
+              onChange={(e) => setAlpha(parseFloat(e.target.value))}
+              disabled={regularization === 'none'}
+              fullWidth
+              variant="outlined"
+              inputProps={{ step: '0.1', min: '0.01', max: '10' }}
+              helperText="Valores típicos: 0.1 - 10. Mayor valor = mayor penalización"
+            />
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="textSecondary">
+                Visualización: {alpha.toFixed(2)}
+              </Typography>
+              <Slider
+                value={alpha}
+                onChange={(_e, newValue) => setAlpha(newValue as number)}
+                min={0.01}
+                max={10}
+                step={0.1}
+                marks={[
+                  { value: 0.1, label: '0.1' },
+                  { value: 5, label: '5' },
+                  { value: 10, label: '10' },
+                ]}
+                disabled={regularization === 'none'}
+                sx={{ mt: 1 }}
+              />
+            </Box>
+          </Box>
+
+          {/* Bootstrap Samples */}
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              Muestras Bootstrap para Intervalos de Confianza
+            </Typography>
+            <TextField
+              type="number"
               value={bootstrapSamples}
               onChange={(e) => setBootstrapSamples(parseInt(e.target.value))}
-              min={100}
-              max={MAX_BOOTSTRAP}
-              step={100}
+              fullWidth
+              variant="outlined"
+              inputProps={{ step: '100', min: '100', max: MAX_BOOTSTRAP.toString() }}
+              helperText={`Rango: 100 - ${MAX_BOOTSTRAP}. Valores típicos: 1000-2000`}
             />
-            <small>
-              Para calcular intervalos de confianza. Valores típicos: 1000-5000. <strong>Máx:</strong> {MAX_BOOTSTRAP}
-            </small>
-        </div>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="textSecondary">
+                {bootstrapSamples} muestras
+              </Typography>
+              <Slider
+                value={bootstrapSamples}
+                onChange={(_e, newValue) => setBootstrapSamples(newValue as number)}
+                min={100}
+                max={MAX_BOOTSTRAP}
+                step={100}
+                marks={[
+                  { value: 100, label: '100' },
+                  { value: 2500, label: '2500' },
+                  { value: 5000, label: '5000' },
+                ]}
+                sx={{ mt: 1 }}
+              />
+            </Box>
+          </Box>
 
-        <button
-          type="submit"
-          className="submit-button"
-          disabled={loading}
-        >
-          {loading ? 'Ajustando modelo...' : 'Ajustar Modelo'}
-        </button>
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : undefined}
+          >
+            {loading ? 'Ajustando modelo...' : 'Ajustar Modelo'}
+          </Button>
+        </Stack>
       </form>
 
-      <div className="info-section">
-        <h3>ℹ️ Información sobre Regularización</h3>
-        <div className="info-content">
-          <h4>OLS (Ordinary Least Squares)</h4>
-          <p>
-            Método estándar que minimiza la suma de cuadrados de residuos.
-            Sin penalización. Recomendado para la mayoría de casos.
-          </p>
+      {/* Info Section */}
+      <Paper sx={{ mt: 4, p: 3, backgroundColor: '#f5f7fa', borderLeft: '4px solid #667eea' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <InfoIcon sx={{ mr: 1, color: 'info.main' }} />
+          <Typography variant="h3" sx={{ fontSize: '1.2rem', fontWeight: 600 }}>
+            ℹ️ Información sobre Parámetros
+          </Typography>
+        </Box>
 
-          <h4>Ridge Regression (L2)</h4>
-          <p>
-            Añade una penalización proporcional al cuadrado de los coeficientes.
-            Útil para manejar multicolinealidad. Alpha mayor = mayor penalización.
-          </p>
+        <Stack spacing={2}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'primary.main' }}>
+                OLS (Ordinary Least Squares)
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Método estándar que minimiza la suma de cuadrados de residuos sin penalización.
+                Ideal cuando tu dataset es grande y los datos son limpios. Recomendado para comenzar.
+              </Typography>
+            </CardContent>
+          </Card>
 
-          <h4>Bootstrap</h4>
-          <p>
-            Se usan muestras bootstrap para calcular intervalos de confianza al 95%
-            para los coeficientes estimados.
-          </p>
-        </div>
-      </div>
-    </div>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'secondary.main' }}>
+                Ridge Regression (L2)
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Añade una penalización proporcional al cuadrado de los coeficientes. Útil para
+                manejar multicolinealidad cuando tus variables independientes están correlacionadas.
+                Mayor alpha = mayor penalización.
+              </Typography>
+            </CardContent>
+          </Card>
+
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'success.main' }}>
+                Bootstrap
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Técnica de remuestreo que calcula intervalos de confianza al 95% para los
+                coeficientes. Más muestras = más precisión pero más tiempo. 1000-2000 es un buen balance.
+              </Typography>
+            </CardContent>
+          </Card>
+        </Stack>
+
+        <Alert severity="info" sx={{ mt: 2 }} icon={<InfoIcon />}>
+          <AlertTitle>💡 Consejo</AlertTitle>
+          Comienza con OLS y 1000 muestras bootstrap. Si notas problemas de multicolinealidad,
+          prueba con Ridge.
+        </Alert>
+      </Paper>
+    </Box>
   )
 }

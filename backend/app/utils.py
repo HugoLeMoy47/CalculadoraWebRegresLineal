@@ -247,8 +247,18 @@ class RegressionFitter:
         """Retorna los resultados de la regresión."""
         feature_names = ['const'] + self.processor.get_feature_names()
         
-        coefficients = dict(zip(feature_names, self.model.params.values))
-        p_values = dict(zip(feature_names, self.model.pvalues.values))
+        # Obtener valores de params y pvalues (compatible con Series y arrays)
+        params_values = self.model.params.values if hasattr(self.model.params, 'values') else self.model.params
+        pvalues_values = self.model.pvalues.values if hasattr(self.model.pvalues, 'values') else self.model.pvalues
+        
+        # Convertir a listas si son numpy arrays
+        if isinstance(params_values, np.ndarray):
+            params_values = params_values.tolist()
+        if isinstance(pvalues_values, np.ndarray):
+            pvalues_values = pvalues_values.tolist()
+            
+        coefficients = dict(zip(feature_names, params_values))
+        p_values = dict(zip(feature_names, pvalues_values))
         
         results = {
             'coefficients': coefficients,
@@ -290,10 +300,17 @@ class Simulator:
         X, y = self.processor.get_regression_data()
         feature_names = self.processor.get_feature_names()
         
+        # Obtener coeficientes del modelo (compatible con Series y arrays)
+        params = self.model.params
+        if hasattr(params, 'values'):
+            params_array = params.values if isinstance(params.values, np.ndarray) else np.array(params.values)
+        else:
+            params_array = params if isinstance(params, np.ndarray) else np.array(params)
+        
         # Predicción base (media)
         X_mean = X.mean(axis=0)
         X_base = np.concatenate([[1], X_mean])  # Add constant
-        baseline_pred = self.model.params.values @ X_base
+        baseline_pred = params_array @ X_base
         
         # Crear escenario
         X_scenario = X_mean.copy()
@@ -309,7 +326,7 @@ class Simulator:
                 raise ValueError(f"Feature no encontrada: {feature}")
         
         X_scenario_full = np.concatenate([[1], X_scenario])
-        scenario_pred = self.model.params.values @ X_scenario_full
+        scenario_pred = params_array @ X_scenario_full
         
         delta = scenario_pred - baseline_pred
         delta_pct = (delta / baseline_pred * 100) if baseline_pred != 0 else 0

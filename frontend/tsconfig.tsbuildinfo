@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/theme.ts","./src/api/client.ts","./src/components/dataupload.tsx","./src/components/modelfit.tsx","./src/components/regressionresults.tsx","./src/components/scenariosimulator.tsx","./src/utils/errorhandler.ts"],"version":"5.9.3"}

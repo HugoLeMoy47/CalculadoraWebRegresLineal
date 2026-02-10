@@ -1,7 +1,33 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  Stack,
+  Grid,
+  Card,
+  CardContent,
+  Slider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Alert,
+  AlertTitle,
+  CircularProgress,
+} from '@mui/material'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import LightbulbIcon from '@mui/icons-material/Lightbulb'
 import { simulateScenario } from '../api/client'
-import './ScenarioSimulator.css'
+import { showErrorWithTips } from '../utils/errorHandler'
 
 interface ScenarioSimulatorProps {
   features: string[]
@@ -16,7 +42,6 @@ interface SimulationResult {
 }
 
 export default function ScenarioSimulator({ features }: ScenarioSimulatorProps) {
-  // Filtrar para excluir 'const'
   const featureFiltered = features.filter((f) => f !== 'const')
 
   const [changes, setChanges] = useState<Record<string, number>>({})
@@ -37,13 +62,16 @@ export default function ScenarioSimulator({ features }: ScenarioSimulatorProps) 
   }
 
   const handleSimulate = async () => {
-    // Filtrar cambios con valores != 0
     const activeChanges = Object.fromEntries(
       Object.entries(changes).filter(([, v]) => v !== 0)
     )
 
     if (Object.keys(activeChanges).length === 0) {
-      toast.error('Por favor especifica al menos un cambio')
+      showErrorWithTips({
+        response: {
+          data: { detail: 'Por favor especifica al menos un cambio' },
+        },
+      })
       return
     }
 
@@ -52,152 +80,298 @@ export default function ScenarioSimulator({ features }: ScenarioSimulatorProps) 
     try {
       const response = await simulateScenario(activeChanges)
       setResult(response.data)
-      toast.success('Simulación completada')
+      toast.success('✓ Simulación completada', { duration: 4000 })
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Error en simulación')
+      showErrorWithTips(error)
     } finally {
       setLoading(false)
     }
   }
 
-  return (
-    <div className="simulator-container">
-      <h2>Simulador de Escenarios</h2>
-      <p className="subtitle">
-        Modifica los gastos por canal y visualiza el impacto predicho
-      </p>
+  const hasActiveChanges = Object.values(changes).some((v) => v !== 0)
 
-      <div className="simulator-content">
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <PlayArrowIcon sx={{ mr: 1, color: 'primary.main', fontSize: 32 }} />
+        <Typography variant="h2" sx={{ fontWeight: 700 }}>
+          Simulador de Escenarios
+        </Typography>
+      </Box>
+      <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
+        Modifica los gastos por canal y visualiza el impacto predicho en tu objetivo
+      </Typography>
+
+      <Grid container spacing={3}>
         {/* Panel de entrada */}
-        <div className="input-panel">
-          <h3>Cambios Porcentuales por Canal</h3>
-          <div className="features-list">
-            {featureFiltered.map((feature) => (
-              <div key={feature} className="feature-input">
-                <label htmlFor={`change-${feature}`}>{feature}</label>
-                <div className="input-wrapper">
-                  <input
-                    id={`change-${feature}`}
+        <Grid item xs={12} md={5}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h3" sx={{ fontWeight: 600, mb: 3 }}>
+              Cambios Porcentuales por Canal
+            </Typography>
+
+            <Stack spacing={3}>
+              {featureFiltered.map((feature) => (
+                <Box key={feature}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      {feature}
+                    </Typography>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        fontWeight: 700,
+                        color: changes[feature] > 0 ? 'success.main' : 'error.main',
+                      }}
+                    >
+                      {changes[feature] >= 0 ? '+' : ''}
+                      {(changes[feature] || 0).toFixed(1)}%
+                    </Typography>
+                  </Box>
+
+                  <TextField
                     type="number"
                     placeholder="0"
                     value={changes[feature] || ''}
                     onChange={(e) => handleChangeInput(feature, e.target.value)}
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    inputProps={{ step: '5', min: '-100', max: '100' }}
+                    sx={{ mb: 1 }}
                   />
-                  <span className="unit">%</span>
-                </div>
-                <input
-                  type="range"
-                  min={-100}
-                  max={100}
-                  value={changes[feature] || 0}
-                  onChange={(e) =>
-                    handleChangeInput(feature, e.target.value)
-                  }
-                  className="slider"
-                />
-              </div>
-            ))}
-          </div>
 
-          <div className="actions">
-            <button
-              onClick={handleSimulate}
-              className="simulate-button"
-              disabled={loading}
-            >
-              {loading ? 'Simulando...' : 'Simular Escenario'}
-            </button>
-            <button onClick={handleReset} className="reset-button">
-              Restablecer
-            </button>
-          </div>
-        </div>
+                  <Slider
+                    value={changes[feature] || 0}
+                    onChange={(_e, newValue) =>
+                      handleChangeInput(feature, newValue.toString())
+                    }
+                    min={-100}
+                    max={100}
+                    step={5}
+                    marks={[
+                      { value: -100, label: '-100%' },
+                      { value: 0, label: '0%' },
+                      { value: 100, label: '+100%' },
+                    ]}
+                  />
+                </Box>
+              ))}
+            </Stack>
+
+            <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleSimulate}
+                disabled={loading || !hasActiveChanges}
+                fullWidth
+                startIcon={loading ? <CircularProgress size={20} /> : <PlayArrowIcon />}
+              >
+                {loading ? 'Simulando...' : 'Simular Escenario'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={handleReset}
+                fullWidth
+                startIcon={<RestartAltIcon />}
+              >
+                Restablecer
+              </Button>
+            </Stack>
+          </Paper>
+        </Grid>
 
         {/* Panel de resultados */}
         {result && (
-          <div className="results-panel">
-            <h3>Resultados de la Simulación</h3>
+          <Grid item xs={12} md={7}>
+            <Stack spacing={3}>
+              {/* Result Cards */}
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+                        Predicción Base
+                      </Typography>
+                      <Typography
+                        variant="h4"
+                        sx={{ fontWeight: 700, color: 'info.main', mb: 1 }}
+                      >
+                        {result.baseline_prediction.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Escenario actual
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
 
-            <div className="result-cards">
-              <div className="result-card baseline">
-                <div className="card-label">Predicción Base</div>
-                <div className="card-value">
-                  {result.baseline_prediction.toFixed(2)}
-                </div>
-                <div className="card-desc">Escenario actual</div>
-              </div>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+                        Predicción Escenario
+                      </Typography>
+                      <Typography
+                        variant="h4"
+                        sx={{ fontWeight: 700, color: 'primary.main', mb: 1 }}
+                      >
+                        {result.scenario_prediction.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Con cambios aplicados
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
 
-              <div className="result-card scenario">
-                <div className="card-label">Predicción Escenario</div>
-                <div className="card-value">
-                  {result.scenario_prediction.toFixed(2)}
-                </div>
-                <div className="card-desc">Con cambios aplicados</div>
-              </div>
+                <Grid item xs={12} sm={6}>
+                  <Card
+                    variant="outlined"
+                    sx={{
+                      backgroundColor: result.delta >= 0 ? '#e8f5e9' : '#ffebee',
+                      borderColor: result.delta >= 0 ? '#4caf50' : '#f44336',
+                    }}
+                  >
+                    <CardContent sx={{ textAlign: 'center' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+                        {result.delta >= 0 ? (
+                          <TrendingUpIcon sx={{ color: 'success.main', fontSize: 32 }} />
+                        ) : (
+                          <TrendingDownIcon sx={{ color: 'error.main', fontSize: 32 }} />
+                        )}
+                      </Box>
+                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+                        Delta Absoluto
+                      </Typography>
+                      <Typography
+                        variant="h4"
+                        sx={{
+                          fontWeight: 700,
+                          color: result.delta >= 0 ? 'success.main' : 'error.main',
+                          mb: 1,
+                        }}
+                      >
+                        {result.delta >= 0 ? '+' : ''}
+                        {result.delta.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Diferencia en unidades
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
 
-              <div className={`result-card delta ${result.delta >= 0 ? 'positive' : 'negative'}`}>
-                <div className="card-label">Delta (Variación Absoluta)</div>
-                <div className="card-value">
-                  {result.delta >= 0 ? '+' : ''}
-                  {result.delta.toFixed(2)}
-                </div>
-                <div className="card-desc">Diferencia en unidades</div>
-              </div>
+                <Grid item xs={12} sm={6}>
+                  <Card
+                    variant="outlined"
+                    sx={{
+                      backgroundColor: result.delta_percentage >= 0 ? '#e8f5e9' : '#ffebee',
+                      borderColor: result.delta_percentage >= 0 ? '#4caf50' : '#f44336',
+                    }}
+                  >
+                    <CardContent sx={{ textAlign: 'center' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+                        {result.delta_percentage >= 0 ? (
+                          <TrendingUpIcon sx={{ color: 'success.main', fontSize: 32 }} />
+                        ) : (
+                          <TrendingDownIcon sx={{ color: 'error.main', fontSize: 32 }} />
+                        )}
+                      </Box>
+                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+                        Cambio Porcentual
+                      </Typography>
+                      <Typography
+                        variant="h4"
+                        sx={{
+                          fontWeight: 700,
+                          color: result.delta_percentage >= 0 ? 'success.main' : 'error.main',
+                          mb: 1,
+                        }}
+                      >
+                        {result.delta_percentage >= 0 ? '+' : ''}
+                        {result.delta_percentage.toFixed(2)}%
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Variación relativa
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
 
-              <div className={`result-card percentage ${result.delta_percentage >= 0 ? 'positive' : 'negative'}`}>
-                <div className="card-label">Cambio Porcentual</div>
-                <div className="card-value">
-                  {result.delta_percentage >= 0 ? '+' : ''}
-                  {result.delta_percentage.toFixed(2)}%
-                </div>
-                <div className="card-desc">Variación relativa</div>
-              </div>
-            </div>
+              {/* Tabla de cambios aplicados */}
+              <Paper>
+                <Box sx={{ p: 2, backgroundColor: '#f5f7fa', borderBottom: '1px solid #e0e0e0' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Cambios Aplicados
+                  </Typography>
+                </Box>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead sx={{ backgroundColor: '#fafbfc' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Variable</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                          Cambio (%)
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(result.changes_applied).map(([var_name, change]) => (
+                        <TableRow key={var_name}>
+                          <TableCell sx={{ fontWeight: 500 }}>{var_name}</TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{
+                              fontWeight: 600,
+                              color: change >= 0 ? 'success.main' : 'error.main',
+                            }}
+                          >
+                            {change >= 0 ? '+' : ''}
+                            {change.toFixed(2)}%
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
 
-            {/* Tabla de cambios aplicados */}
-            <div className="changes-table-container">
-              <h4>Cambios Aplicados</h4>
-              <table className="changes-table">
-                <thead>
-                  <tr>
-                    <th>Variable</th>
-                    <th>Cambio (%)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(result.changes_applied).map(([var_name, change]) => (
-                    <tr key={var_name}>
-                      <td className="var-name">{var_name}</td>
-                      <td className={change >= 0 ? 'positive' : 'negative'}>
-                        {change >= 0 ? '+' : ''}
-                        {change.toFixed(2)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Insights */}
-            <div className="insights">
-              <h4>💡 Insights</h4>
-              <ul>
-                <li>
-                  {result.delta >= 0
-                    ? `El cambio predicho generaría una mejora de ${Math.abs(result.delta).toFixed(2)} ${result.delta_percentage >= 0 ? '(+' : '('} ${result.delta_percentage.toFixed(2)}%)`
-                    : `El cambio predicho resultaría en una reducción de ${Math.abs(result.delta).toFixed(2)} (${result.delta_percentage.toFixed(2)}%)`}
-                </li>
-                <li>
-                  Predicción base (sin cambios): {result.baseline_prediction.toFixed(2)}
-                </li>
-                <li>
-                  Nueva predicción (con cambios): {result.scenario_prediction.toFixed(2)}
-                </li>
-              </ul>
-            </div>
-          </div>
+              {/* Insights */}
+              <Alert severity="info" icon={<LightbulbIcon />}>
+                <AlertTitle>💡 Insights de Impacto</AlertTitle>
+                <Stack spacing={1} sx={{ fontSize: '0.9rem' }}>
+                  <Box>
+                    {result.delta >= 0
+                      ? `✓ El escenario predicho generaría una mejora de ${Math.abs(result.delta).toFixed(2)} unidades (+${result.delta_percentage.toFixed(2)}%)`
+                      : `⚠ El escenario predicho resultaría en una reducción de ${Math.abs(result.delta).toFixed(2)} unidades (${result.delta_percentage.toFixed(2)}%)`}
+                  </Box>
+                  <Box>
+                    📊 Predicción base (sin cambios): <strong>{result.baseline_prediction.toFixed(2)}</strong>
+                  </Box>
+                  <Box>
+                    🎯 Nueva predicción (con cambios): <strong>{result.scenario_prediction.toFixed(2)}</strong>
+                  </Box>
+                </Stack>
+              </Alert>
+            </Stack>
+          </Grid>
         )}
-      </div>
-    </div>
+
+        {/* Empty state */}
+        {!result && hasActiveChanges && (
+          <Grid item xs={12} md={7}>
+            <Paper sx={{ p: 4, textAlign: 'center', backgroundColor: '#f9f9f9' }}>
+              <Typography variant="body1" color="textSecondary">
+                Haz clic en "Simular Escenario" para ver los resultados
+              </Typography>
+            </Paper>
+          </Grid>
+        )}
+      </Grid>
+    </Box>
   )
 }

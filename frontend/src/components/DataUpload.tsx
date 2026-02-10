@@ -1,7 +1,28 @@
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Alert,
+  AlertTitle,
+  CircularProgress,
+  Stack,
+  Chip,
+} from '@mui/material'
+import CloudUploadIcon from '@mui/icons-material/CloudUpload'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import InfoIcon from '@mui/icons-material/Info'
 import { uploadData } from '../api/client'
-import './DataUpload.css'
+import { showErrorWithTips } from '../utils/errorHandler'
 
 interface DataUploadProps {
   onSuccess: () => void
@@ -14,15 +35,16 @@ export default function DataUpload({ onSuccess }: DataUploadProps) {
   const [featureColumns, setFeatureColumns] = useState('')
   const [controlColumns, setControlColumns] = useState('')
   const [loading, setLoading] = useState(false)
-  const MAX_UPLOAD_BYTES = 5_000_000 // 5 MB (must match backend limit)
+  const MAX_UPLOAD_BYTES = 5_000_000
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const f = e.target.files[0]
 
       if (f && f.size > MAX_UPLOAD_BYTES) {
-        toast.error('Archivo demasiado grande. Tamaño máximo: 5 MB')
-        // clear the input
+        showErrorWithTips({
+          response: { data: { detail: 'Archivo demasiado grande. Tamaño máximo: 5 MB' } },
+        })
         e.currentTarget.value = ''
         setFile(null)
         return
@@ -36,12 +58,20 @@ export default function DataUpload({ onSuccess }: DataUploadProps) {
     e.preventDefault()
 
     if (!file) {
-      toast.error('Por favor selecciona un archivo CSV')
+      showErrorWithTips({
+        response: { data: { detail: 'Por favor selecciona un archivo CSV' } },
+      })
       return
     }
 
     if (!dateColumn || !targetColumn || !featureColumns) {
-      toast.error('Por favor completa todos los campos requeridos')
+      showErrorWithTips({
+        response: {
+          data: {
+            detail: 'Por favor completa todos los campos requeridos (Fecha, Target, Features)',
+          },
+        },
+      })
       return
     }
 
@@ -68,125 +98,177 @@ export default function DataUpload({ onSuccess }: DataUploadProps) {
         controlCols
       )
 
-      toast.success(`Datos cargados: ${response.data.shape[0]} observaciones`)
+      toast.success(
+        `✓ Datos cargados: ${response.data.shape[0]} observaciones, ${response.data.shape[1]} columnas`,
+        { duration: 4000 }
+      )
       onSuccess()
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Error al cargar datos')
+      showErrorWithTips(error)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="upload-container">
-      <h2>Cargar Datos CSV</h2>
-      <p className="instruction">
+    <Box sx={{ maxWidth: 700, mx: 'auto' }}>
+      <Typography variant="h2" sx={{ mb: 1, fontWeight: 700 }}>
+        Cargar Datos CSV
+      </Typography>
+      <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
         Sube un archivo CSV con datos de marketing (mínimo 10 observaciones)
-      </p>
+      </Typography>
 
-      <form onSubmit={handleSubmit} className="upload-form">
-        <div className="form-group">
-          <label htmlFor="file">Archivo CSV</label>
-          <input
-            type="file"
-            id="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            className="file-input"
-            required
-          />
-          <small className="hint">Tamaño máximo: 5 MB. Formato: .csv</small>
-          {file && (
-            <p className="file-name">✓ {file.name} — {(file.size / 1024 / 1024).toFixed(2)} MB</p>
-          )}
-        </div>
+      <form onSubmit={handleSubmit}>
+        <Stack spacing={3}>
+          {/* File Input */}
+          <Box>
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<CloudUploadIcon />}
+              fullWidth
+              sx={{
+                py: 2,
+                border: '2px dashed',
+                borderColor: 'primary.main',
+                '&:hover': {
+                  borderColor: 'secondary.main',
+                  backgroundColor: 'rgba(102, 126, 234, 0.05)',
+                },
+              }}
+            >
+              Seleccionar Archivo CSV
+              <input
+                type="file"
+                hidden
+                accept=".csv"
+                onChange={handleFileChange}
+              />
+            </Button>
+            <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+              Tamaño máximo: 5 MB. Solo archivos .csv
+            </Typography>
+            {file && (
+              <Chip
+                icon={<CheckCircleIcon />}
+                label={`${file.name} — ${(file.size / 1024 / 1024).toFixed(2)} MB`}
+                color="success"
+                variant="outlined"
+                sx={{ mt: 1 }}
+              />
+            )}
+          </Box>
 
-        <div className="form-group">
-          <label htmlFor="dateColumn">Columna de Fecha *</label>
-          <input
-            type="text"
-            id="dateColumn"
+          {/* Form Fields */}
+          <TextField
+            label="Columna de Fecha"
             placeholder="ej: Date"
+            fullWidth
             value={dateColumn}
             onChange={(e) => setDateColumn(e.target.value)}
             required
+            variant="outlined"
+            helperText="Nombre exacto de la columna de fecha en tu CSV"
           />
-        </div>
 
-        <div className="form-group">
-          <label htmlFor="targetColumn">Columna Objetivo (Target) *</label>
-          <input
-            type="text"
-            id="targetColumn"
+          <TextField
+            label="Columna Objetivo (Target)"
             placeholder="ej: Conversions, Sales"
+            fullWidth
             value={targetColumn}
             onChange={(e) => setTargetColumn(e.target.value)}
             required
+            variant="outlined"
+            helperText="Variable que deseas predecir (ej: Conversions, Revenue)"
           />
-        </div>
 
-        <div className="form-group">
-          <label htmlFor="featureColumns">Columnas de Features (canales) *</label>
-          <input
-            type="text"
-            id="featureColumns"
+          <TextField
+            label="Columnas de Features (Canales)"
             placeholder="ej: Channel_A_Spend, Channel_B_Spend, Channel_C_Spend"
+            fullWidth
+            multiline
+            rows={2}
             value={featureColumns}
             onChange={(e) => setFeatureColumns(e.target.value)}
             required
+            variant="outlined"
+            helperText="Variables independientes separadas por comas"
           />
-          <small>Separa múltiples columnas con comas</small>
-        </div>
 
-        <div className="form-group">
-          <label htmlFor="controlColumns">Columnas de Control (opcional)</label>
-          <input
-            type="text"
-            id="controlColumns"
+          <TextField
+            label="Columnas de Control (Opcional)"
             placeholder="ej: Seasonality_Index"
+            fullWidth
+            multiline
+            rows={2}
             value={controlColumns}
             onChange={(e) => setControlColumns(e.target.value)}
+            variant="outlined"
+            helperText="Variables de control opcionales separadas por comas"
           />
-          <small>Variables de control separadas por comas</small>
-        </div>
 
-        <button
-          type="submit"
-          className="submit-button"
-          disabled={loading}
-        >
-          {loading ? 'Cargando...' : 'Cargar Datos'}
-        </button>
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            disabled={loading || !file}
+            startIcon={loading ? <CircularProgress size={20} /> : undefined}
+          >
+            {loading ? 'Cargando datos...' : 'Cargar Datos'}
+          </Button>
+        </Stack>
       </form>
 
-      <div className="example-section">
-        <h3>Formato esperado</h3>
-        <p>El CSV debe contener columnas numéricas y una columna de fecha:</p>
-        <table className="example-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Channel_A_Spend</th>
-              <th>Channel_B_Spend</th>
-              <th>Conversions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>2024-01-01</td>
-              <td>5000.00</td>
-              <td>3000.00</td>
-              <td>1200</td>
-            </tr>
-            <tr>
-              <td>2024-02-01</td>
-              <td>5200.50</td>
-              <td>3100.25</td>
-              <td>1350</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {/* Example Section */}
+      <Paper sx={{ mt: 4, p: 3, backgroundColor: '#f5f7fa', borderLeft: '4px solid #667eea' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <InfoIcon sx={{ mr: 1, color: 'info.main' }} />
+          <Typography variant="h3" sx={{ fontSize: '1.2rem', fontWeight: 600 }}>
+            Formato Esperado
+          </Typography>
+        </Box>
+
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          Tu archivo CSV debe contener columnas numéricas y una columna de fecha:
+        </Typography>
+
+        <TableContainer component={Paper} elevation={0} sx={{ mb: 2 }}>
+          <Table size="small">
+            <TableHead sx={{ backgroundColor: '#e8eef7' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Channel_A_Spend</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Channel_B_Spend</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Conversions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell>2024-01-01</TableCell>
+                <TableCell>5000.00</TableCell>
+                <TableCell>3000.00</TableCell>
+                <TableCell>1200</TableCell>
+              </TableRow>
+              <TableRow sx={{ backgroundColor: '#fafbfc' }}>
+                <TableCell>2024-02-01</TableCell>
+                <TableCell>5200.50</TableCell>
+                <TableCell>3100.25</TableCell>
+                <TableCell>1350</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Alert severity="info" icon={<InfoIcon />}>
+          <AlertTitle>💡 Consejos</AlertTitle>
+          <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+            <li>Asegúrate de que los nombres de columnas sean exactos (mayúsculas y espacios)</li>
+            <li>Todas las columnas de datos deben ser numéricas</li>
+            <li>Se recomienda mínimo 30 observaciones para resultados confiables</li>
+          </ul>
+        </Alert>
+      </Paper>
+    </Box>
   )
 }
