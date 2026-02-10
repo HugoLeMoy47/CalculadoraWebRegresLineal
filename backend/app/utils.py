@@ -9,6 +9,9 @@ from sklearn.preprocessing import StandardScaler
 import warnings
 
 warnings.filterwarnings('ignore')
+import logging
+
+logger = logging.getLogger("attribution_utils")
 
 
 class DataProcessor:
@@ -148,8 +151,13 @@ class RegressionFitter:
         self.vif_values = self._calculate_vif(X, feature_names)
         
         # Bootstrap para intervalos de confianza
-        if bootstrap_samples > 0:
-            self.bootstrap_ci = self._bootstrap_ci(X, y, bootstrap_samples)
+        if bootstrap_samples and bootstrap_samples > 0:
+            # evitar uso excesivo de CPU/memoria si el usuario pasa un valor enorme
+            max_allowed = 5000
+            n_bs = min(int(bootstrap_samples), max_allowed)
+            if int(bootstrap_samples) > max_allowed:
+                logger.warning(f"bootstrap_samples reducido a {max_allowed} por seguridad")
+            self.bootstrap_ci = self._bootstrap_ci(X, y, n_bs)
         
         return self._get_results()
     
@@ -191,10 +199,14 @@ class RegressionFitter:
             for i in range(X_features.shape[1]):
                 # Solo calcular para features, no para controles
                 if i < len(self.processor.feature_columns):
-                    vif_value = variance_inflation_factor(X_features, i)
-                    vif_dict[feature_names_clean[i]] = float(vif_value)
+                    try:
+                        vif_value = variance_inflation_factor(X_features, i)
+                        vif_dict[feature_names_clean[i]] = float(vif_value)
+                    except Exception as e:
+                        logger.exception(f"Error calculando VIF para {feature_names_clean[i]}")
+                        vif_dict[feature_names_clean[i]] = float('nan')
         except Exception as e:
-            print(f"Error calculando VIF: {str(e)}")
+            logger.exception(f"Error calculando VIF: {str(e)}")
         
         return vif_dict
     
@@ -216,6 +228,10 @@ class RegressionFitter:
             except:
                 continue
         
+        if len(coef_samples) == 0:
+            logger.warning("Bootstrap no pudo generar muestras válidas; devolviendo dict vacío")
+            return {}
+
         coef_samples = np.array(coef_samples)
         ci_dict = {}
         

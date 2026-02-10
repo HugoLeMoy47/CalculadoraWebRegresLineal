@@ -1,11 +1,12 @@
 """API FastAPI para calculadora de atribución marketing."""
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import io
 from typing import Optional
-import traceback
+import logging
+import math
 
 from .models import (
     ColumnMapping, FitRequest, ScenarioRequest, RegressionResults, SimulationResult
@@ -22,16 +23,23 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Estado global
-processor = None
-fitter = None
-simulator = None
+#"""Estado de la aplicación guardado en app.state para evitar variables globales sueltas."""
+app.state.processor = None
+app.state.fitter = None
+app.state.simulator = None
+
+# Seguridad / límites
+MAX_UPLOAD_SIZE = 5_000_000  # bytes (aprox 5MB)
+MAX_BOOTSTRAP = 5000
+
+logger = logging.getLogger("attribution_api")
+logging.basicConfig(level=logging.INFO)
 
 
 @app.get("/")
@@ -52,9 +60,10 @@ def root():
 @app.get("/status")
 def status():
     """Retorna el estado actual de los datos cargados."""
+    processor = app.state.processor
     if processor is None or processor.data is None:
         return {"status": "no_data", "message": "No hay datos cargados"}
-    
+
     return {
         "status": "ready",
         "observations": len(processor.data),
@@ -83,19 +92,44 @@ async def upload_data(
         feature_columns: Columnas de features (separadas por comas)
         control_columns: Columnas de control (separadas por comas, opcional)
     """
-    global processor
-    
+    # Validaciones iniciales de seguridad
+    content_type = file.content_type or ""
+    if content_type and not any(x in content_type for x in ("text", "csv", "application")):
+        raise HTTPException(status_code=400, detail="Tipo de archivo no soportado")
+
     try:
-        # Leer CSV
         contents = await file.read()
+    except Exception:
+        logger.exception("Error leyendo archivo subido")
+        raise HTTPException(status_code=400, detail="No se pudo leer el archivo")
+
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            detail=f"Archivo demasiado grande (>{MAX_UPLOAD_SIZE} bytes)")
+
+    try:
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
-        
+    except Exception as e:
+        logger.exception("Error parseando CSV")
+        raise HTTPException(status_code=400, detail=f"Error al parsear CSV: {str(e)}")
+
+    try:
         # Parsear columnas
-        feature_cols = [col.strip() for col in feature_columns.split(',')]
+        feature_cols = [col.strip() for col in feature_columns.split(',') if col.strip()]
         control_cols = None
         if control_columns:
-            control_cols = [col.strip() for col in control_columns.split(',')]
-        
+            control_cols = [col.strip() for col in control_columns.split(',') if col.strip()]
+
+        # Evitar nombres duplicados
+        names_seen = set()
+        dupes = set()
+        for c in [date_column, target_column] + feature_cols + (control_cols or []):
+            if c in names_seen:
+                dupes.add(c)
+            names_seen.add(c)
+        if dupes:
+            raise HTTPException(status_code=400, detail=f"Nombres de columnas duplicados: {dupes}")
+
         # Crear y cargar datos
         processor = DataProcessor()
         processor.load_data(
@@ -105,7 +139,10 @@ async def upload_data(
             feature_cols=feature_cols,
             control_cols=control_cols
         )
-        
+
+        # Guardar en estado de la app
+        app.state.processor = processor
+
         return {
             "status": "success",
             "message": f"Datos cargados: {len(df)} observaciones",
@@ -113,8 +150,10 @@ async def upload_data(
             "shape": df.shape,
             "date_range": f"{processor.data[date_column].min()} to {processor.data[date_column].max()}"
         }
-    
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Error en upload_data")
         raise HTTPException(
             status_code=400,
             detail=f"Error al cargar datos: {str(e)}"
@@ -129,28 +168,41 @@ def fit_model(request: FitRequest):
     Args:
         request: Parámetros de regresión (regularización, alpha, bootstrap_samples)
     """
-    global processor, fitter, simulator
-    
     try:
+        processor = app.state.processor
         if processor is None or processor.data is None:
             raise ValueError("No hay datos cargados. Use /upload primero")
-        
+
+        # Validaciones de parametros
+        alpha = float(request.alpha or 1.0)
+        if alpha <= 0 or not math.isfinite(alpha):
+            raise ValueError("Parámetro alpha debe ser un número positivo")
+
+        bootstrap_samples = int(request.bootstrap_samples or 1000)
+        if bootstrap_samples < 0 or bootstrap_samples > MAX_BOOTSTRAP:
+            raise ValueError(f"bootstrap_samples debe estar entre 0 y {MAX_BOOTSTRAP}")
+
+        if request.regularization and request.regularization.lower() not in ("ridge",):
+            raise ValueError("regularization sólo soporta 'ridge' o null")
+
         # Ajustar modelo
         fitter = RegressionFitter(processor)
         results = fitter.fit(
             regularization=request.regularization,
-            alpha=request.alpha or 1.0,
-            bootstrap_samples=request.bootstrap_samples or 1000
+            alpha=alpha,
+            bootstrap_samples=bootstrap_samples
         )
-        
-        # Inicializar simulador
+
+        # Inicializar simulador y guardar estado
         simulator = Simulator(fitter)
-        
+        app.state.fitter = fitter
+        app.state.simulator = simulator
+
         # Detectar multicolinealidad
         high_vif = {}
-        if results['vif_values']:
+        if results.get('vif_values'):
             high_vif = {k: v for k, v in results['vif_values'].items() if v > 10}
-        
+
         return {
             "status": "success",
             "message": "Modelo ajustado correctamente",
@@ -171,12 +223,11 @@ def fit_model(request: FitRequest):
             "residuals": results['residuals'],
             "bootstrap_ci": results.get('bootstrap_ci', {})
         }
-    
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error al ajustar modelo: {str(e)}\n{traceback.format_exc()}"
-        )
+        logger.exception("Error al ajustar modelo")
+        raise HTTPException(status_code=400, detail=f"Error al ajustar modelo: {str(e)}")
 
 
 @app.post("/simulate")
@@ -187,12 +238,11 @@ def simulate_scenario(request: ScenarioRequest):
     Args:
         request: Cambios porcentuales por variable
     """
-    global simulator
-    
     try:
+        simulator = app.state.simulator
         if simulator is None:
             raise ValueError("Modelo no ajustado. Use /fit primero")
-        
+
         result = simulator.simulate(request.changes)
         
         return {
@@ -204,21 +254,21 @@ def simulate_scenario(request: ScenarioRequest):
             "changes_applied": result['changes_applied']
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error en simulación: {str(e)}"
-        )
+        logger.exception("Error en simulación")
+        raise HTTPException(status_code=400, detail=f"Error en simulación: {str(e)}")
 
 
 @app.post("/metrics")
 def get_metrics():
     """Retorna métricas adicionales."""
-    global processor, fitter
-    
+    fitter = app.state.fitter
+
     if fitter is None:
         raise HTTPException(status_code=400, detail="Modelo no ajustado")
-    
+
     return {
         "observations": fitter.model.nobs,
         "residuals_mean": float(fitter.residuals.mean()),
