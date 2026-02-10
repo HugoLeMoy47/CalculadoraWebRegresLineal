@@ -196,6 +196,24 @@ Output:
   }
 ```
 
+### Estado en memoria y límites operativos
+
+El backend utiliza `app.state` (FastAPI application state) para mantener en memoria el último `DataProcessor` cargado y el último `RegressionFitter`/`Simulator` ajustado. Esto facilita un flujo interactivo en sesiones de desarrollo y demo, pero implica las siguientes consideraciones:
+
+- `app.state` es volátil y compartido por la instancia de la aplicación; en entornos con múltiples procesos o instancias (por ejemplo, detrás de un load balancer) el estado no es consistente entre réplicas.
+- Actualmente el servicio aplica límites operativos para proteger recursos:
+        - Tamaño máximo de archivo CSV aceptado en `/upload`: **5 MB** (5_000_000 bytes). Peticiones que excedan este límite retornan HTTP 413.
+        - Límite máximo de muestras bootstrap en `/fit`: **5000**. Valores mayores serán rechazados o recortados por el servidor.
+
+Recomendaciones para producción:
+
+- Persistir datasets y modelos en un almacenamiento compartido (base de datos, S3, o Redis) en lugar de `app.state`.
+- Convertir procesos pesados (bootstrap, re-ajustes con muchas réplicas) a tareas en background usando una cola (Celery, RQ) y workers dedicados.
+- Añadir autenticación/autorización y scoping por usuario/organización para evitar que un usuario vea o sobrescriba el estado de otro.
+- Monitorizar uso de memoria y tiempo de CPU, y exponer métricas (Prometheus) para alertas.
+
+Estas notas están alineadas con las validaciones en el frontend (mensajes sobre tamaño máximo y límite bootstrap) y la documentación de instalación.
+
 ## Frontend - Arquitectura
 
 ### Componentes React
