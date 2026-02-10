@@ -1,0 +1,142 @@
+.model-fit-container {
+  max-width: 700px;
+}
+
+.model-fit-container h2 {
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  color: #999;
+  margin-bottom: 30px;
+  font-size: 1rem;
+}
+
+.model-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 40px;
+  padding: 25px;
+  background: #f9f9f9;
+  border-radius: 12px;
+}
+
+.model-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-form label {
+  font-weight: 600;
+  color: #333;
+  font-size: 1rem;
+}
+
+.model-form input,
+.model-form select {
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: white;
+  transition: border-color 0.3s;
+}
+
+.model-form input:focus,
+.model-form select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.model-form input:disabled,
+.model-form select:disabled {
+  background: #f0f0f0;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-group.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.model-form small {
+  color: #666;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.submit-button {
+  padding: 14px 28px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-top: 10px;
+}
+
+.submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.info-section {
+  background: #f0f7ff;
+  padding: 25px;
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+}
+
+.info-section h3 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+}
+
+.info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.info-content h4 {
+  color: #667eea;
+  margin-bottom: 5px;
+  font-size: 1rem;
+}
+
+.info-content p {
+  color: #666;
+  margin: 0;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+  .model-fit-container h2 {
+    font-size: 1.4rem;
+  }
+
+  .model-form {
+    padding: 15px;
+  }
+
+  .info-section {
+    padding: 15px;
+  }
+}
